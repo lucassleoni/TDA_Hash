@@ -12,7 +12,7 @@
 
 typedef struct nodo{
 	void* elemento;
-	void* clave;	// Modificación agregada para el TDA Hash
+	const char* clave;	// Modificación agregada para el TDA Hash
 	struct nodo* siguiente;
 } nodo_t;
 
@@ -108,16 +108,54 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 		return ERROR;
 	}
 
-	nodo_t* nuevo_nodo = malloc(sizeof(nodo_t));
-	if(nuevo_nodo == NULL){
+	int posicion_hash = hashear(clave);
+	lista_insertar(hash->vector_hash[posicion_hash], clave, elemento);
+
+	return EXITO;
+}
+
+// Pre C.: Recibe un puntero a la lista y a la clave buscada.
+// Post C.: Devuelve un puntero al nodo con la clave buscada o NULL en caso de error.
+nodo_t* buscar_nodo_por_clave(nodo_t* nodo_inicio, const char* clave){	// Función agregada para el TDA Hash
+	if(lista_vacia(lista)){
+		return NULL;
+	}
+
+	bool nodo_encontrado = false;
+	nodo_t* nodo_buscado = NULL;
+	nodo_t* nodo_aux = nodo_inicio;
+	
+	while(!nodo_encontrado){
+		if(nodo_aux->clave == clave){
+			nodo_buscado = nodo_aux;
+			nodo_encontrado = true;
+		}
+		else{
+			nodo_aux = nodo_aux->siguiente;
+		}
+	}
+
+	return nodo_buscado;
+}
+
+// Pre C.: Recibe un puntero al nodo que se quiere borrar y un puntero a la clave del mismo.
+// Post C.: Devuelve '0' si se borró correctamente o '-1' en caso de error.
+int borrar_nodo_por_clave(lista_t* lista, const char* clave, hash_destruir_dato_t destructor){
+	if(lista_vacia(lista)){
 		return ERROR;
 	}
 
-	int posicion_hash = hashear(clave);
+	nodo_t* nodo_buscado = buscar_nodo_por_clave(lista->nodo_inicio, clave);	// Está mal (intentar con iterador)
+	destructor(nodo_buscado->elemento);
 
-	
+	nodo_t* nodo_aux = nodo_buscado->siguiente->siguiente;
+	free(nodo_buscado->siguiente);
+	nodo_buscado->siguiente = nodo_aux;
+
+	(lista->cantidad)--;
+
+	return EXITO;
 }
-
 /*
  * Quita un elemento del hash e invoca la funcion destructora
  * pasandole dicho elemento.
@@ -127,6 +165,9 @@ int hash_quitar(hash_t* hash, const char* clave){
 	if((hay_error(hash)) || (hash_vacio(hash))){
 		return ERROR;
 	}
+
+	int posicion_hash = hashear(clave);
+	nodo_t* nodo_borrar = borrar_nodo_por_clave(hash->vector_hash[posicion_hash], clave, hash->destructor);
 
 	return EXITO;
 }

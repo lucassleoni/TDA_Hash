@@ -60,7 +60,7 @@ bool lista_vacia(lista_t* lista){
 
 // Pre C.: Recibe un puntero a la lista y la posición buscada.
 // Post C.: Devuelve un puntero al nodo en la posicón buscada o NULL en caso de error.
-nodo_t* buscar_nodo(lista_t* lista, size_t posicion){
+nodo_t* buscar_nodo_posicion(lista_t* lista, size_t posicion){
 	if((lista_vacia(lista)) || (posicion >= lista->cantidad)){
 		return NULL;
 	}
@@ -82,7 +82,7 @@ nodo_t* buscar_nodo(lista_t* lista, size_t posicion){
  * Inserta un elemento al final de la lista.
  * Devuelve 0 si pudo insertar o -1 si no pudo.
  */
-int lista_insertar(lista_t* lista, void* elemento, const char* clave){	// Se agregó el campo "clave" para el TDA Hash
+int lista_insertar(lista_t* lista, const char* clave, void* elemento){	// Se agregó el campo "clave" para el TDA Hash
 	if(hay_error_lista(lista)){
 		return ERROR;
 	}
@@ -135,7 +135,7 @@ int lista_insertar_en_posicion(lista_t* lista, void* elemento, size_t posicion){
 		lista->nodo_inicio = nodo;
 	}
 	else{
-		nodo_t* nodo_aux = buscar_nodo(lista, posicion-1);
+		nodo_t* nodo_aux = buscar_nodo_posicion(lista, posicion-1);
 		nodo->siguiente = nodo_aux->siguiente;
 		nodo_aux->siguiente = nodo;
 	}
@@ -161,7 +161,7 @@ int lista_borrar(lista_t* lista){
 		lista->nodo_fin = NULL;
 	}
 	else{
-		nodo_t* nodo_aux = buscar_nodo(lista, (lista->cantidad)-2);
+		nodo_t* nodo_aux = buscar_nodo_posicion(lista, (lista->cantidad)-2);
 		free(lista->nodo_fin);
 		lista->nodo_fin = nodo_aux;
 		lista->nodo_fin->siguiente = NULL;
@@ -207,7 +207,7 @@ int lista_borrar_de_posicion(lista_t* lista, size_t posicion){
 		lista_borrar_nodo_inicial(lista, nodo_aux);
 	}
 	else{
-		nodo_aux = buscar_nodo(lista, posicion-1);
+		nodo_aux = buscar_nodo_posicion(lista, posicion-1);
 		nodo_t* nodo_aux_2 = nodo_aux->siguiente->siguiente;
 		free(nodo_aux->siguiente);
 		nodo_aux->siguiente = nodo_aux_2;
@@ -228,7 +228,7 @@ void* lista_elemento_en_posicion(lista_t* lista, size_t posicion){
 	if((lista_vacia(lista)) || (posicion >= lista->cantidad)){
 		return NULL;
 	}
-	nodo_t* nodo = buscar_nodo(lista, posicion);
+	nodo_t* nodo = buscar_nodo_posicion(lista, posicion);
 
 	return (nodo->elemento);
 }
