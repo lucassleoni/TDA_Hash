@@ -292,7 +292,6 @@ void hash_destruir(hash_t* hash){
 	while(!hash_vacio(hash)){
     	for(int i = 0; i < (hash->capacidad); i++){
 			lista_destruir(hash->vector_listas_hash[i]);
-			(hash->cantidad_elementos)--;
 		}
 	}
 
