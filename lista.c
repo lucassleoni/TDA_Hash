@@ -177,9 +177,14 @@ void lista_borrar_nodo_inicial(lista_t* lista, nodo_t* nodo_aux){
 		return;
 	}
 	
-	nodo_aux = lista->nodo_inicio->siguiente;
-	free(lista->nodo_inicio);
-	lista->nodo_inicio = nodo_aux;
+	if((lista->cantidad) > 1){
+		nodo_aux = lista->nodo_inicio->siguiente;
+		free(lista->nodo_inicio);
+		lista->nodo_inicio = nodo_aux;
+	}
+	else{
+		lista->nodo_inicio = lista->nodo_fin = NULL;
+	}
 }
 
 /*
@@ -197,14 +202,13 @@ int lista_borrar_de_posicion(lista_t* lista, size_t posicion){
 	nodo_t* nodo_aux = NULL;
 
 	if(posicion >= lista->cantidad){
-		lista_borrar(lista);
-		return EXITO;
+		return lista_borrar(lista);
 	}
 
 	if(posicion == 0){
 		lista_borrar_nodo_inicial(lista, nodo_aux);
 	}
-	else{
+	else if(posicion > 0){
 		nodo_aux = buscar_nodo(lista, posicion-1);
 		nodo_t* nodo_aux_2 = nodo_aux->siguiente->siguiente;
 		free(nodo_aux->siguiente);

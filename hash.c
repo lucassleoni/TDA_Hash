@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
-#include "/home/lucassleoni/Desktop/FIUBA/Algoritmos y Programación/Algo2/TP's/TDA's/TDA Hash (TP N° 6)/lista.h"
+#include "lista.h"
 #include "hash.h"
 #include "hash_iterador.h"
 
@@ -16,7 +16,7 @@
 
 typedef struct bloque{
 	void* elemento;
-	const char* clave;
+	char* clave;
 } bloque_t;
 
 struct hash{
@@ -140,7 +140,8 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 		return ERROR;
 	}
 
-	bloque->clave = clave;
+	int estado = ERROR;
+	bloque->clave = (char*)clave;
 	bloque->elemento = elemento;
 
 	/*if((hash->factor_de_carga) >= FACTOR_MAX){
@@ -154,11 +155,17 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
 
-	lista_insertar(lista, bloque);
-	(hash->cantidad_elementos)++;
-	hash->factor_de_carga = hash->cantidad_elementos / hash->capacidad;
+	if(hash_contiene(hash, clave)){
+		hash_quitar(hash, clave);
+	}
 
-	return EXITO;
+	if(lista_insertar(lista, bloque) == EXITO){
+		estado = EXITO;
+		(hash->cantidad_elementos)++;
+		hash->factor_de_carga = hash->cantidad_elementos / hash->capacidad;
+	}
+
+	return estado;
 }
 
 /*
@@ -174,6 +181,7 @@ int hash_quitar(hash_t* hash, const char* clave){
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
 	
+	int estado = ERROR;
 	size_t contador_posicion = 0;
 	bool bloque_borrado = false;
 	bloque_t* bloque_aux = NULL;
@@ -183,12 +191,13 @@ int hash_quitar(hash_t* hash, const char* clave){
 		return ERROR;
 	}
 
-	while((lista_iterador_tiene_siguiente(iterador)) && (!bloque_borrado)){
+	while((!bloque_borrado) && (lista_iterador_tiene_siguiente(iterador))){
 		bloque_aux = lista_iterador_siguiente(iterador);
 
-		if(bloque_aux->clave == clave){
+		if(strcmp(bloque_aux->clave, clave) == 0){
 			(hash->destructor)(bloque_aux->elemento);
-			lista_borrar_de_posicion(lista, contador_posicion);
+			free(bloque_aux);
+			estado = lista_borrar_de_posicion(lista, contador_posicion);
 			bloque_borrado = true;
 		}
 		contador_posicion++;
@@ -197,7 +206,7 @@ int hash_quitar(hash_t* hash, const char* clave){
 	lista_iterador_destruir(iterador);
 	(hash->cantidad_elementos)--;
 
-	return EXITO;
+	return estado;
 }
 
 /*
@@ -224,7 +233,7 @@ void* hash_obtener(hash_t* hash, const char* clave){
 	while((lista_iterador_tiene_siguiente(iterador)) && (!elemento_encontrado)){
 		bloque_aux = lista_iterador_siguiente(iterador);
 
-		if(bloque_aux->clave == clave){
+		if(strcmp(bloque_aux->clave, clave) == 0){
 			elemento_buscado = bloque_aux->elemento;
 			elemento_encontrado = true;
 		}
@@ -258,7 +267,7 @@ bool hash_contiene(hash_t* hash, const char* clave){
 	while((lista_iterador_tiene_siguiente(iterador)) && (!elemento_encontrado)){
 		bloque_aux = lista_iterador_siguiente(iterador);
 
-		if(bloque_aux->clave == clave){
+		if(strcmp(bloque_aux->clave, clave) == 0){
 			elemento_encontrado = true;
 		}
 	}
@@ -291,6 +300,8 @@ void hash_destruir(hash_t* hash){
 
 	while(!hash_vacio(hash)){
     	for(int i = 0; i < (hash->capacidad); i++){
+
+    		//(hash->destructor)()
 			lista_destruir(hash->vector_listas_hash[i]);
 		}
 	}
@@ -338,7 +349,7 @@ hash_iterador_t* hash_iterador_crear(hash_t* hash){
 	}
 
 	iterador->lista_corriente = 0;
-	iterador->cantidad_listas_por_recorrer = hash->capacidad;
+	iterador->cantidad_listas_por_recorrer = (hash->capacidad)-1;
 	iterador->vector_listas = hash->vector_listas_hash;
 	
 	iterador->lista_iterador = lista_iterador_crear(iterador->vector_listas[iterador->lista_corriente]);
@@ -387,6 +398,8 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
 		lista_iterador_destruir(iterador->lista_iterador);
 
 		(iterador->lista_corriente)++;
+		(iterador->cantidad_listas_por_recorrer)--;
+
 		iterador->lista_iterador = lista_iterador_crear(iterador->vector_listas[iterador->lista_corriente]);
 		if((iterador->lista_iterador) == NULL){
 			return NULL;
@@ -394,7 +407,6 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
 		bloque_aux = lista_iterador_siguiente(iterador->lista_iterador);
 	}
 	
-	(iterador->cantidad_listas_por_recorrer)--;
 	void* clave = (void*)(bloque_aux->clave);
 
 	return clave;
