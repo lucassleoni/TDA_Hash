@@ -54,7 +54,6 @@ void ejecutar_caso_feliz(){
     verificar_vehiculo(garage, "QDM443", true);
     verificar_vehiculo(garage, "PQO697", true);
 
-
     quitar_vehiculo(garage, "QDM443");
     quitar_vehiculo(garage, "PQO697");
 
@@ -72,7 +71,9 @@ void ejecutar_caso_feliz(){
         }
     }
 
+    printf("Cantidad: %zu\n", hash_cantidad(garage));
     printf("Cantidad de autos guardados: %zu. Cantidad de autos listados: %zu -- %s\n", hash_cantidad(garage), listados, (hash_cantidad(garage)==listados)?"OK":"ERROR");
+
 
     hash_iterador_destruir(iter);
     hash_destruir(garage);
