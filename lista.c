@@ -201,7 +201,7 @@ int lista_borrar_de_posicion(lista_t* lista, size_t posicion){
 
 	nodo_t* nodo_aux = NULL;
 
-	if(posicion >= lista->cantidad - 1){
+	if(posicion >= (lista->cantidad)-1){
 		return lista_borrar(lista);
 	}
 

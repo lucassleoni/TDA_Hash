@@ -1,5 +1,3 @@
-// Revisar si se modifica la cantidad de elementos al insertar/borrar
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -54,8 +52,8 @@ void hash_crear_listas(lista_t** vector_listas_hash, size_t capacidad, bool* hay
  * Capacidad indica la capacidad minima inicial con la que se crea el hash.
  * Devuelve un puntero al hash creado o NULL en caso de no poder crearlo.
  */
-hash_t* hash_crear(hash_destruir_dato_t destruir_elemento, size_t capacidad){
-	if(destruir_elemento == NULL){
+hash_t* hash_crear(hash_destruir_dato_t destruir_cada_elemento, size_t capacidad){
+	if(destruir_cada_elemento == NULL){
 		return NULL;
 	}
 
@@ -82,7 +80,7 @@ hash_t* hash_crear(hash_destruir_dato_t destruir_elemento, size_t capacidad){
 	hash->capacidad = capacidad;
 	hash->cantidad_elementos = 0;
 	hash->factor_de_carga = 0;
-	hash->destructor = destruir_elemento;
+	hash->destructor = destruir_cada_elemento;
 
 	return hash;
 }
@@ -288,6 +286,43 @@ size_t hash_cantidad(hash_t* hash){
 	return (hash->cantidad_elementos);
 }
 
+// Pre C.: Recibe un puntero al Hash.
+// Post C.: Invoca a la función destructora con cada elemento del Hash, utilizando el iterador externo de la lista.
+int destruir_cada_elemento(hash_t* hash){
+	if(hay_error_hash(hash)){
+		return ERROR;
+	}
+
+	int estado = EXITO;
+	bloque_t* bloque = NULL;
+	lista_t* lista = NULL;
+
+	for(int i = 0; i < (hash->capacidad); i++){
+		lista = hash->vector_listas_hash[i];
+		
+		while((estado == EXITO) && (!lista_vacia(lista))){
+			
+			lista_iterador_t* iterador = lista_iterador_crear(lista);
+			if(iterador == NULL){
+				estado = ERROR;
+			}
+
+			bloque = lista_iterador_siguiente(iterador);
+
+			if(bloque != NULL){
+				(hash->destructor)(bloque->elemento);
+				free(bloque);
+				(hash->cantidad_elementos)--;
+				lista_borrar_de_posicion(lista, 0);
+			}
+
+			lista_iterador_destruir(iterador);
+		}
+	}
+
+	return estado;
+}
+
 /*
  * Destruye el hash liberando la memoria reservada y asegurandose de
  * invocar la funcion destructora con cada elemento almacenado en el
@@ -298,10 +333,8 @@ void hash_destruir(hash_t* hash){
 		return;
 	}
 
-	while(!hash_vacio(hash)){
-    	for(int i = 0; i < (hash->capacidad); i++){
-
-    		//(hash->destructor)()
+	if(destruir_cada_elemento(hash) == EXITO){
+		for(int i = 0; i < (hash->capacidad); i++){
 			lista_destruir(hash->vector_listas_hash[i]);
 		}
 	}
