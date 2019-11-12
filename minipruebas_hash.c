@@ -71,7 +71,6 @@ void ejecutar_caso_feliz(){
         }
     }
 
-    printf("Cantidad: %zu\n", hash_cantidad(garage));
     printf("Cantidad de autos guardados: %zu. Cantidad de autos listados: %zu -- %s\n", hash_cantidad(garage), listados, (hash_cantidad(garage)==listados)?"OK":"ERROR");
 
 

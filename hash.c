@@ -351,16 +351,16 @@ void hash_destruir(hash_t* hash){
 
 /* Iterador externo para el HASH */
 struct hash_iter{
+	hash_t* hash;
 	size_t cantidad_listas_por_recorrer;
 	size_t lista_corriente;
-	lista_t** vector_listas;
 	lista_iterador_t* lista_iterador;
 };
 
 // Pre C.: Recibe la estructura del iterador externo.
 // Post C.: Devuelve 'true' si la lista a la que apunta el iterador es nula y 'false' en caso contrario.
 bool hay_error_iterador_hash(hash_iterador_t* iterador){
-	return ((iterador == NULL) || (iterador->vector_listas == NULL));
+	return ((iterador == NULL) || (iterador->hash->vector_listas_hash == NULL) || (iterador->lista_iterador == NULL));
 }
 
 /*
@@ -383,34 +383,14 @@ hash_iterador_t* hash_iterador_crear(hash_t* hash){
 
 	iterador->lista_corriente = 0;
 	iterador->cantidad_listas_por_recorrer = (hash->capacidad)-1;
-	iterador->vector_listas = hash->vector_listas_hash;
+	iterador->hash = hash;
 	
-	iterador->lista_iterador = lista_iterador_crear(iterador->vector_listas[iterador->lista_corriente]);
+	iterador->lista_iterador = lista_iterador_crear(iterador->hash->vector_listas_hash[iterador->lista_corriente]);
 	if((iterador->lista_iterador) == NULL){
 		return NULL;
 	}
 
 	return iterador;
-}
-
-/*
- * Devuelve true si quedan claves por recorrer o false en caso
- * contrario.
- */
-bool hash_iterador_tiene_siguiente(hash_iterador_t* iterador){
-	if((hay_error_iterador_hash(iterador)) || ((iterador->cantidad_listas_por_recorrer) == 0)){
-		return false;
-	}
-
-	if(lista_iterador_tiene_siguiente(iterador->lista_iterador)){
-		return true;
-	}
-
-	if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && (iterador->cantidad_listas_por_recorrer > 0)){
-		return true;
-	}
-
-	return ((iterador->cantidad_listas_por_recorrer) > 0);
 }
 
 /*
@@ -433,7 +413,7 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
 		(iterador->lista_corriente)++;
 		(iterador->cantidad_listas_por_recorrer)--;
 
-		iterador->lista_iterador = lista_iterador_crear(iterador->vector_listas[iterador->lista_corriente]);
+		iterador->lista_iterador = lista_iterador_crear(iterador->hash->vector_listas_hash[iterador->lista_corriente]);
 		if((iterador->lista_iterador) == NULL){
 			return NULL;
 		}
@@ -443,6 +423,36 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
 	void* clave = (void*)(bloque_aux->clave);
 
 	return clave;
+}
+
+/*
+ * Devuelve true si quedan claves por recorrer o false en caso
+ * contrario.
+ */
+bool hash_iterador_tiene_siguiente(hash_iterador_t* iterador){
+	if((hay_error_iterador_hash(iterador)) || ((iterador->cantidad_listas_por_recorrer) == 0)){
+		return false;
+	}
+
+	if(lista_iterador_tiene_siguiente(iterador->lista_iterador)){
+		return true;
+	}
+
+	if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && (iterador->cantidad_listas_por_recorrer > 0)){
+		bool tiene_siguiente = false;
+		size_t lista_corriente = iterador->lista_corriente;
+		lista_t* proxima_lista = iterador->hash->vector_listas_hash[lista_corriente + 1];
+
+		while((!tiene_siguiente) && (lista_corriente <= (iterador->hash->capacidad)-1)){
+			tiene_siguiente = !lista_vacia(proxima_lista);
+			lista_corriente++;
+			proxima_lista = iterador->hash->vector_listas_hash[lista_corriente + 1];
+		}
+		
+		return tiene_siguiente;
+	}
+
+	return (iterador->cantidad_listas_por_recorrer > 0);
 }
 
 /*
