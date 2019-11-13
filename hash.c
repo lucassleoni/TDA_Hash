@@ -9,8 +9,8 @@
 
 #define ERROR -1
 #define EXITO 0
-#define FACTOR_MAX 0.75
-#define COEFICIENTE_REHASH 1.25
+#define FACTOR_MAX 3
+#define TAM_REHASH 2
 
 typedef struct bloque{
 	void* elemento;
@@ -25,9 +25,12 @@ struct hash{
 	hash_destruir_dato_t destructor;
 };
 
+// Necesario porque strdup es POSIX pero no C99
+extern char* strdup(const char*);
+
 // Pre C.: Recibe un puntero al vector de listas, la capacidad inicial del hash y un puntero a una variable
 //		   booleana que vierifica el éxito/error del procedimiento.
-// Post C.: Crea la listas correspondientes a cada lugar del vector Hash. En caso de un error antes de finalizar, destuye las listas creadas y retorna.
+// Post C.: Crea la listas correspondientes a cada lugar del vector Hash. En caso de haber un error antes de finalizar, destruye las listas creadas y retorna.
 void hash_crear_listas(lista_t** vector_listas_hash, size_t capacidad, bool* hay_lista_nula){
 	int i = 0;
 
@@ -94,7 +97,7 @@ bool hay_error_hash(hash_t* hash){
 // Pre C.: Recibe un puntero al Hash.
 // Post C.: Devuelve 'true' si la la cantidad de elementos del Hash es igual a '0'.
 bool hash_vacio(hash_t* hash){
-	return(hash->cantidad_elementos == 0);
+	return((hay_error_hash(hash)) || (hash->cantidad_elementos == 0));
 }
 
 // Pre C.: Recibe la clave sobre la que se va a calcular el valor de Hash.
@@ -109,20 +112,66 @@ size_t hashear(const char* clave, size_t capacidad){
 	return (valor_clave % capacidad);
 }
 
+// Pre C.: Recibe punteros al Hash y a un vector estático de tipo 'bloque_t*', junto con su tope.
+// Post C.: Almacena todos los elementos del Hash en un vector estático.
+void guardar_elementos(hash_t* hash, bloque_t* vector[], int* posicion_elemento){
+	lista_t* lista_corriente = NULL;
+
+	for(int i = 0; i < hash->capacidad; i++){
+		lista_corriente = hash->vector_listas_hash[i];
+		lista_iterador_t* lista_iterador = lista_iterador_crear(lista_corriente);
+		
+		while(lista_iterador_tiene_siguiente(lista_iterador)){
+			vector[*posicion_elemento] = lista_iterador_siguiente(lista_iterador);
+			(*posicion_elemento)++;
+		}
+
+		lista_destruir(lista_corriente);
+		lista_iterador_destruir(lista_iterador);
+	}
+}
+
 // Pre C.: Recibe un puntero al Hash.
-// Post C.: Devuelve el valor de Hash correspondiente a la clave recibida.
-/*int rehashear(hash_t* hash){
+// Post C.: Redimensiona el vector_listas_hash, actualizando la capacidad del Hash y volviendo a insertar todos los elementos.
+int rehashear(hash_t* hash){
 	if(hay_error_hash(hash)){
 		return ERROR;
 	}
 
-	lista_t** vector_hash_aux = realloc(hash->vector_listas_hash, sizeof(lista_t*) * hash->capacidad * COEFICIENTE_REHASH);
+	size_t nueva_capacidad = hash->capacidad * TAM_REHASH;
+	lista_t** vector_hash_aux = realloc(hash->vector_listas_hash, sizeof(lista_t*) * nueva_capacidad);
 	if(vector_hash_aux == NULL){
 		return ERROR;
 	}
-
 	hash->vector_listas_hash = vector_hash_aux;
-}*/
+	
+	printf("\tIniciando rehash...\n");
+
+	int posicion_elemento = 0;
+	bloque_t* vector_bloques[hash->cantidad_elementos];
+
+	guardar_elementos(hash, vector_bloques, &posicion_elemento);
+
+	hash->capacidad = nueva_capacidad;
+	hash->factor_de_carga = 0;
+	hash->cantidad_elementos = 0;
+
+	bool hay_lista_nula = false;
+	hash_crear_listas(hash->vector_listas_hash, hash->capacidad, &(hay_lista_nula));
+	if(hay_lista_nula){
+		free(hash->vector_listas_hash);
+		free(hash);
+		return ERROR;
+	}
+
+	for(int i = 0; i < posicion_elemento; i++){
+		hash_insertar(hash, vector_bloques[i]->clave, strdup(vector_bloques[i]->elemento));
+		(hash->destructor)(vector_bloques[i]->elemento);
+		free(vector_bloques[i]);
+	}
+
+	return EXITO;
+}
 
 /*
  * Inserta un elemento reservando la memoria necesaria para el mismo.
@@ -138,17 +187,13 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 		return ERROR;
 	}
 
+	if((hash->factor_de_carga) >= FACTOR_MAX){
+		rehashear(hash);
+	}
+
 	int estado = ERROR;
 	bloque->clave = (char*)clave;
 	bloque->elemento = elemento;
-
-	/*if((hash->factor_de_carga) >= FACTOR_MAX){
-		if(rehashear(hash) == ERROR){
-			(hash->destructor)(bloque->elemento);
-			free(bloque);
-			return ERROR;
-		}
-	}*/
 
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
@@ -166,6 +211,35 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 	return estado;
 }
 
+// Pre C.: Recibe un puntero a la lista puede hallarse el elemento con la clave buscada (también recibida) y un contador de posición.
+// Post C.: Devuelve un puntero al bloque con la clave recibida.
+bloque_t* buscar_nodo_por_clave(lista_t* lista, const char* clave, size_t* contador_posicion){
+	bloque_t* bloque_aux = NULL;
+	bloque_t* bloque_buscado = NULL;
+	bool bloque_encontrado = false;
+	
+	lista_iterador_t* iterador = lista_iterador_crear(lista);
+	if(iterador == NULL){
+		return NULL;
+	}
+
+	while((!bloque_encontrado) && (lista_iterador_tiene_siguiente(iterador))){
+		bloque_aux = lista_iterador_siguiente(iterador);
+		
+		if(strcmp(bloque_aux->clave, clave) == 0){
+			bloque_buscado = bloque_aux;
+			bloque_encontrado = true;
+		}
+		else{
+			(*contador_posicion)++;
+		}
+	}
+
+	lista_iterador_destruir(iterador);
+
+	return bloque_buscado;
+}
+
 /*
  * Quita un elemento del hash e invoca la funcion destructora
  * pasandole dicho elemento.
@@ -175,34 +249,20 @@ int hash_quitar(hash_t* hash, const char* clave){
 	if((hay_error_hash(hash)) || (hash_vacio(hash))){
 		return ERROR;
 	}
-
+	
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
-	
+
 	int estado = ERROR;
 	size_t contador_posicion = 0;
-	bool bloque_borrado = false;
-	bloque_t* bloque_aux = NULL;
+	bloque_t* bloque_buscado = buscar_nodo_por_clave(lista, clave, &contador_posicion);
 
-	lista_iterador_t* iterador = lista_iterador_crear(lista);
-	if(iterador == NULL){
-		return ERROR;
+	if(bloque_buscado != NULL){
+		(hash->destructor)(bloque_buscado->elemento);
+		free(bloque_buscado);
+		estado = lista_borrar_de_posicion(lista, contador_posicion);
+		(hash->cantidad_elementos)--;
 	}
-
-	while((!bloque_borrado) && (lista_iterador_tiene_siguiente(iterador))){
-		bloque_aux = lista_iterador_siguiente(iterador);
-
-		if(strcmp(bloque_aux->clave, clave) == 0){
-			(hash->destructor)(bloque_aux->elemento);
-			free(bloque_aux);
-			estado = lista_borrar_de_posicion(lista, contador_posicion);
-			bloque_borrado = true;
-		}
-		contador_posicion++;
-	}
-
-	lista_iterador_destruir(iterador);
-	(hash->cantidad_elementos)--;
 
 	return estado;
 }
@@ -212,32 +272,20 @@ int hash_quitar(hash_t* hash, const char* clave){
  * elemento no existe.
  */
 void* hash_obtener(hash_t* hash, const char* clave){
-	if((hay_error_hash(hash)) || (hash_vacio(hash))){
+	if((hay_error_hash(hash)) || (hash_vacio(hash)) || (!hash_contiene(hash, clave))){
 		return NULL;
 	}
 
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
 
-	bool elemento_encontrado = false;
+	size_t contador_posicion = 0;
 	void* elemento_buscado = NULL;
-	bloque_t* bloque_aux = NULL;
+	bloque_t* bloque_buscado = buscar_nodo_por_clave(lista, clave, &contador_posicion);
 
-	lista_iterador_t* iterador = lista_iterador_crear(lista);
-	if(iterador == NULL){
-		return NULL;
+	if(bloque_buscado != NULL){
+		elemento_buscado = bloque_buscado->elemento;
 	}
-
-	while((lista_iterador_tiene_siguiente(iterador)) && (!elemento_encontrado)){
-		bloque_aux = lista_iterador_siguiente(iterador);
-
-		if(strcmp(bloque_aux->clave, clave) == 0){
-			elemento_buscado = bloque_aux->elemento;
-			elemento_encontrado = true;
-		}
-	}
-
-	lista_iterador_destruir(iterador);
 
 	return elemento_buscado;
 }
@@ -250,27 +298,17 @@ bool hash_contiene(hash_t* hash, const char* clave){
 	if((hay_error_hash(hash)) || (hash_vacio(hash))){
 		return false;
 	}
-
+	
 	size_t posicion_hash = hashear(clave, hash->capacidad);
 	lista_t* lista = hash->vector_listas_hash[posicion_hash];
 
+	size_t contador_posicion = 0;
 	bool elemento_encontrado = false;
-	bloque_t* bloque_aux = NULL;
+	bloque_t* bloque_buscado = buscar_nodo_por_clave(lista, clave, &contador_posicion);
 
-	lista_iterador_t* iterador = lista_iterador_crear(lista);
-	if(iterador == NULL){
-		return ERROR;
+	if(bloque_buscado != NULL){
+		elemento_encontrado = true;
 	}
-
-	while((lista_iterador_tiene_siguiente(iterador)) && (!elemento_encontrado)){
-		bloque_aux = lista_iterador_siguiente(iterador);
-
-		if(strcmp(bloque_aux->clave, clave) == 0){
-			elemento_encontrado = true;
-		}
-	}
-	
-	lista_iterador_destruir(iterador);
 
 	return elemento_encontrado;
 }
@@ -300,13 +338,12 @@ int destruir_cada_elemento(hash_t* hash){
 	for(int i = 0; i < (hash->capacidad); i++){
 		lista = hash->vector_listas_hash[i];
 		
-		while((estado == EXITO) && (!lista_vacia(lista))){
-			
+		while((estado == EXITO) && (!lista_vacia(lista))){	
 			lista_iterador_t* iterador = lista_iterador_crear(lista);
 			if(iterador == NULL){
 				estado = ERROR;
 			}
-
+			
 			bloque = lista_iterador_siguiente(iterador);
 
 			if(bloque != NULL){
@@ -315,7 +352,6 @@ int destruir_cada_elemento(hash_t* hash){
 				(hash->cantidad_elementos)--;
 				lista_borrar_de_posicion(lista, 0);
 			}
-
 			lista_iterador_destruir(iterador);
 		}
 	}
@@ -353,7 +389,6 @@ void hash_destruir(hash_t* hash){
 struct hash_iter{
 	hash_t* hash;
 	lista_iterador_t* lista_iterador;
-	size_t cantidad_listas_por_recorrer;
 	size_t lista_corriente;
 };
 
@@ -383,7 +418,6 @@ hash_iterador_t* hash_iterador_crear(hash_t* hash){
 
 	iterador->hash = hash;
 	iterador->lista_corriente = 0;
-	iterador->cantidad_listas_por_recorrer = (hash->capacidad)-1;
 	
 	iterador->lista_iterador = lista_iterador_crear(iterador->hash->vector_listas_hash[iterador->lista_corriente]);
 	if((iterador->lista_iterador) == NULL){
@@ -407,53 +441,26 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
 
 	if(lista_iterador_tiene_siguiente(iterador->lista_iterador)){
 		bloque_aux = lista_iterador_siguiente(iterador->lista_iterador);
+		return bloque_aux->clave;
 	}
-	else if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && (iterador->cantidad_listas_por_recorrer > 0)){
+	else if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && ((iterador->lista_corriente) < (iterador->hash->capacidad)-1)){
 		lista_iterador_destruir(iterador->lista_iterador);
-		lista_t* proxima_lista = iterador->hash->vector_listas_hash[(iterador->lista_corriente) + 1];
+		(iterador->lista_corriente)++;
 
-		while(lista_vacia(proxima_lista)){
+		while((lista_vacia(iterador->hash->vector_listas_hash[iterador->lista_corriente])) && ((iterador->lista_corriente) < (iterador->hash->capacidad)-1)){
 			(iterador->lista_corriente)++;
-			(iterador->cantidad_listas_por_recorrer)--;
-			proxima_lista = iterador->hash->vector_listas_hash[(iterador->lista_corriente) + 1];
 		}
 
-		if((iterador->cantidad_listas_por_recorrer) > 0){
-			iterador->lista_iterador = lista_iterador_crear(iterador->hash->vector_listas_hash[iterador->lista_corriente]);
-			if((iterador->lista_iterador) == NULL){
-				return NULL;
-			}
-			bloque_aux = lista_iterador_siguiente(iterador->lista_iterador);
+		iterador->lista_iterador = lista_iterador_crear(iterador->hash->vector_listas_hash[iterador->lista_corriente]);
+		if((iterador->lista_iterador) == NULL){
+			return NULL;
 		}
-	}
-	
-	if(bloque_aux == NULL){
-		return NULL;
+
+		bloque_aux = lista_iterador_siguiente(iterador->lista_iterador);
+		return bloque_aux->clave;
 	}
 
-	void* clave = (void*)(bloque_aux->clave);
-
-	return clave;
-
-
-	/*else if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && (iterador->cantidad_listas_por_recorrer > 0)){
-		lista_iterador_destruir(iterador->lista_iterador);
-		lista_t* proxima_lista = iterador->hash->vector_listas_hash[(iterador->lista_corriente) + 1];
-
-		while((lista_vacia(proxima_lista)) && ((iterador->cantidad_listas_por_recorrer) > 0)){
-			(iterador->cantidad_listas_por_recorrer)--;
-			(iterador->lista_corriente)++;
-			proxima_lista = iterador->hash->vector_listas_hash[(iterador->lista_corriente) + 1];
-		}
-
-		if((iterador->cantidad_listas_por_recorrer) > 0){
-			iterador->lista_iterador = lista_iterador_crear(proxima_lista);
-			if((iterador->lista_iterador) == NULL){
-				return NULL;
-			}
-			bloque_aux = lista_iterador_siguiente(iterador->lista_iterador);
-		}
-	}*/
+	return NULL;
 }
 
 /*
@@ -461,15 +468,19 @@ void* hash_iterador_siguiente(hash_iterador_t* iterador){
  * contrario.
  */
 bool hash_iterador_tiene_siguiente(hash_iterador_t* iterador){
-	if((hay_error_iterador_hash(iterador)) || ((iterador->cantidad_listas_por_recorrer) == 0)){
+	if((hay_error_iterador_hash(iterador)) || (hash_vacio(iterador->hash))){
 		return false;
 	}
-
+	
+	if(!lista_iterador_tiene_siguiente(iterador->lista_iterador) && (iterador->lista_corriente == (iterador->hash->capacidad)-1)){
+		return false;
+	}
+	
 	if(lista_iterador_tiene_siguiente(iterador->lista_iterador)){
 		return true;
 	}
 
-	if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && (iterador->cantidad_listas_por_recorrer > 0)){
+	if((!lista_iterador_tiene_siguiente(iterador->lista_iterador)) && ((iterador->lista_corriente) < (iterador->hash->capacidad)-1)){
 		bool tiene_siguiente = false;
 		size_t lista_corriente = iterador->lista_corriente;
 		lista_t* proxima_lista = NULL;
