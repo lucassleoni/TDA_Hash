@@ -16,7 +16,7 @@ extern char* strdup(const char*);
 
 void destruir_string(void* elemento){
     if(elemento){
-        //printf("(Destructor) Libero el vehiculo: %s\n", (char*)elemento);
+        printf("(Destructor) Libero el vehiculo: %s\n", (char*)elemento);
         free(elemento);
     }
 }

@@ -18,10 +18,10 @@ typedef struct bloque{
 } bloque_t;
 
 struct hash{
-	lista_t** vector_listas_hash;
 	size_t capacidad;
 	size_t cantidad_elementos;
 	size_t factor_de_carga;
+	lista_t** vector_listas_hash;
 	hash_destruir_dato_t destructor;
 };
 
@@ -56,10 +56,6 @@ void hash_crear_listas(lista_t** vector_listas_hash, size_t capacidad, bool* hay
  * Devuelve un puntero al hash creado o NULL en caso de no poder crearlo.
  */
 hash_t* hash_crear(hash_destruir_dato_t destruir_cada_elemento, size_t capacidad){
-	if(destruir_cada_elemento == NULL){
-		return NULL;
-	}
-
 	hash_t* hash = malloc(sizeof(hash_t));
 	if(hash == NULL){
 		return NULL;
@@ -166,7 +162,10 @@ int rehashear(hash_t* hash){
 
 	for(int i = 0; i < posicion_elemento; i++){
 		hash_insertar(hash, vector_bloques[i]->clave, strdup(vector_bloques[i]->elemento));
-		(hash->destructor)(vector_bloques[i]->elemento);
+		if((hash->destructor) != NULL){
+			(hash->destructor)(vector_bloques[i]->elemento);
+		}
+		free(vector_bloques[i]->clave);
 		free(vector_bloques[i]);
 	}
 
@@ -192,7 +191,7 @@ int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 	}
 
 	int estado = ERROR;
-	bloque->clave = (char*)clave;
+	bloque->clave = strdup(clave);
 	bloque->elemento = elemento;
 
 	size_t posicion_hash = hashear(clave, hash->capacidad);
@@ -258,7 +257,10 @@ int hash_quitar(hash_t* hash, const char* clave){
 	bloque_t* bloque_buscado = buscar_nodo_por_clave(lista, clave, &contador_posicion);
 
 	if(bloque_buscado != NULL){
-		(hash->destructor)(bloque_buscado->elemento);
+		if((hash->destructor) != NULL){
+			(hash->destructor)(bloque_buscado->elemento);
+		}
+		free(bloque_buscado->clave);
 		free(bloque_buscado);
 		estado = lista_borrar_de_posicion(lista, contador_posicion);
 		(hash->cantidad_elementos)--;
@@ -343,16 +345,20 @@ int destruir_cada_elemento(hash_t* hash){
 			if(iterador == NULL){
 				estado = ERROR;
 			}
-			
-			bloque = lista_iterador_siguiente(iterador);
+			else{
+				bloque = lista_iterador_siguiente(iterador);
 
-			if(bloque != NULL){
-				(hash->destructor)(bloque->elemento);
-				free(bloque);
-				(hash->cantidad_elementos)--;
-				lista_borrar_de_posicion(lista, 0);
+				if(bloque != NULL){
+					if((hash->destructor) != NULL){
+						(hash->destructor)(bloque->elemento);
+					}
+					free(bloque->clave);
+					free(bloque);
+					(hash->cantidad_elementos)--;
+					lista_borrar_de_posicion(lista, 0);
+				}
+				lista_iterador_destruir(iterador);
 			}
-			lista_iterador_destruir(iterador);
 		}
 	}
 
