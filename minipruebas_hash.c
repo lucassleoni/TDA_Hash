@@ -4,6 +4,7 @@
 #include "hash.h"
 #include "hash_iterador.h"
 
+#define EXITO  0
 #define ERROR -1
 
 typedef struct bloque{
@@ -16,7 +17,7 @@ extern char* strdup(const char*);
 
 void destruir_string(void* elemento){
     if(elemento){
-        printf("(Destructor) Libero el vehiculo: %s\n", (char*)elemento);
+        //printf("(Destructor) Libero el vehiculo: %s\n", (char*)elemento);
         free(elemento);
     }
 }
@@ -95,18 +96,19 @@ void con_hash_vacio_hash_quitar_deberia_devolver_error(){
     printf("Prueba #1: Con Hash vacío, hash_quitar debería devolver error.\n");
 
     char* clave = "AD578GS";
+    int estado = hash_quitar(garage, clave);
 
     printf("\t%s: Si el Hash está vacío, hash_quitar %s error. \n",
-          (hash_quitar(garage, clave) == ERROR)?"EXITO":"FALLO",
-          (hash_quitar(garage, clave) == ERROR)?"devuelve":"no devuelve");
+        (estado == ERROR)?"EXITO":"FALLO",
+        (estado == ERROR)?"devuelve":"no devuelve");
 
     hash_destruir(garage);
 }
 
 // Pre C.: ---
-// Post C.: Inserta una cantidad de elementos que supere el factor máximo de carga y verifica si se modifica la capacidad,
-//          imprimiendo el resultado de la prueba por pantalla.
-void sobrepasar_el_factor_maximo_de_carga_deberia_rehashear(){
+// Post C.: Inserta una cantidad de elementos que supere el factor máximo de carga y verifica si se modifica la capacidad
+//          (conservando los elementos), imprimiendo el resultado de la prueba por pantalla.
+void sobrepasar_el_factor_maximo_de_carga_deberia_rehashear_y_conservar_los_elementos(){
     hash_t* garage = hash_crear(destruir_string, 5);
 
     printf("\nPrueba #2: Al sobrepasar el factor de carga, hash_insertar debería rehashear (verificar rehasheo por pantalla).\n");
@@ -117,7 +119,6 @@ void sobrepasar_el_factor_maximo_de_carga_deberia_rehashear(){
     for(int i = 0; i < 16; i++){
         hash_insertar(garage, claves[i], strdup(elementos[i]));
     }
-
 
     int cantidad_coincidencias = 0;
     for(int i = 0; i < 16; i++){
@@ -138,13 +139,15 @@ void sobrepasar_el_factor_maximo_de_carga_deberia_rehashear(){
 void si_pido_un_elemento_con_clave_no_existente_deberia_devolver_NULL(){
     hash_t* garage = hash_crear(destruir_string, 2);
 
-    printf("\nPrueba #3: Al enviar una clave no presente en el Hash, la función hash_obtener devuelve NULL.\n");
+    printf("\nPrueba #3: Al enviar una clave no presente en el Hash, la función hash_obtener debería devolver NULL.\n");
 
     hash_insertar(garage, "AC123BD", strdup("Auto de Mariano"));
 
+    void* elemento = hash_obtener(garage, "A421ACB");
+
     printf("\t%s: Enviando una clave no existente, hash_obtener %s NULL. \n",
-          (hash_obtener(garage, "A421ACB") == NULL)?"EXITO":"FALLO",
-          (hash_obtener(garage, "A421ACB") == NULL)?"devuelve":"no devuelve");
+        (elemento == NULL)?"EXITO":"FALLO",
+        (elemento == NULL)?"devuelve":"no devuelve");
 
     hash_destruir(garage);
 }
@@ -164,21 +167,27 @@ void con_hash_vacio_la_cantidad_de_elementos_deberia_ser_cero(){
 }
 
 // Pre C.: ---
-// Post C.: Crea y avanza el iterador externo hasta la última posición válida posible y verifica si devuelve NULL,
+// Post C.: Crea y avanza el iterador externo hasta la última posición válida posible y verifica si avanzar nuevamente devuelve NULL,
 //          imprimiendo el resultado de la prueba por pantalla.
 void ejecutar_iterador_siguiente_sobre_el_ultimo_elemento_deberia_devolver_NULL(){
     hash_t* garage = hash_crear(destruir_string, 2);
     hash_iterador_t* iterador = hash_iterador_crear(garage);
 
-    printf("\nPrueba #5: Con Hash vacío, el iterador no debería tener siguiente.\n");
+    printf("\nPrueba #5: Al estar apuntado al último elemento, el iterador no debería tener siguiente.\n");
+
+    hash_insertar(garage, "DZE443", strdup("Auto de Jonathan"));
+    hash_insertar(garage, "QDM443", strdup("Auto de Daniela"));
+    hash_insertar(garage, "KMW765", strdup("Auto de Charly"));
 
     while(hash_iterador_tiene_siguiente(iterador)){
         hash_iterador_siguiente(iterador);
     }
 
-    printf("\t%s: Avanzar el iterador sobre el ultimo elemento %s NULL. \n",
-          (hash_iterador_siguiente(iterador) == NULL)?"EXITO":"FALLO",
-          (hash_iterador_siguiente(iterador) == NULL)?"devuelve":"no devuelve");
+    void* elemento = hash_iterador_siguiente(iterador);
+
+    printf("\t%s: Avanzar el iterador sobre el último elemento %s NULL. \n",
+        (elemento == NULL)?"EXITO":"FALLO",
+        (elemento == NULL)?"devuelve":"no devuelve");
 
     hash_iterador_destruir(iterador);
     hash_destruir(garage);
@@ -192,9 +201,10 @@ void insertar_elemento_sobre_hash_nulo_deberia_devolver_error(){
 
     printf("\nPrueba #6: Con Hash nulo, hash_insertar debería devolver error.\n");
 
+    int estado = hash_insertar(garage, "AC123BD", "Auto de Mariano");
     printf("\t%s: Si el Hash es nulo, hash_insertar %s error. \n",
-          (hash_insertar(garage, "AC123BD", "Auto de Mariano") == ERROR)?"EXITO":"FALLO",
-          (hash_insertar(garage, "AC123BD", "Auto de Mariano") == ERROR)?"devuelve":"no devuelve");
+        (estado == ERROR)?"EXITO":"FALLO",
+        (estado == ERROR)?"devuelve":"no devuelve");
 }
 
 // Pre C.: ---
@@ -205,13 +215,71 @@ void con_hash_vacio_el_iterador_externo_no_deberia_tener_siguiente(){
 
     printf("\nPrueba #7: Con Hash vacío, el iterador no debería tener siguiente.\n");
 
+    bool tiene_siguiente = hash_iterador_tiene_siguiente(iterador);
+
     printf("\t%s: Si el Hash está vacío, el iterador %s siguiente. \n",
-          (!hash_iterador_tiene_siguiente(iterador))?"EXITO":"FALLO",
-          (!hash_iterador_tiene_siguiente(iterador))?"no tiene":"tiene");
+        (!tiene_siguiente)?"EXITO":"FALLO",
+        (!tiene_siguiente)?"no tiene":"tiene");
 
     hash_iterador_destruir(iterador);
     hash_destruir(garage);
 }
+
+// Pre C.: ---
+// Post C.: Verifica que al insertar una clave nula se obtenga el código de error establecido '-1', imprimiendo el resultado de la prueba por pantalla.
+void insertar_elemento_con_clave_nula_deberia_devolver_error(){
+    hash_t* garage = hash_crear(destruir_string, 2);
+    char* clave = NULL;
+
+    printf("\nPrueba #8: Insertar una clave nula debería devolver error.\n");
+
+    int estado = hash_insertar(garage, clave, strdup("Auto de Luke"));
+
+    printf("\t%s: Insertar clave nula %s ERROR. \n",
+        (estado == ERROR)?"EXITO":"FALLO",
+        (estado == ERROR)?"devuelve":"no devuelve");
+
+    hash_destruir(garage);
+}
+
+// Pre C.: ---
+// Post C.: Verifica que borrar un elemento no presente en el Hash devuelva error, imprimiendo el resultado de la prueba por pantalla.
+void quitar_elemento_no_existente_deberia_devolver_error(){
+    hash_t* garage = hash_crear(destruir_string, 2);
+
+    printf("\nPrueba #9: Quitar elemento ya borrado debería devolver error.\n");
+
+    hash_insertar(garage, "DZE443", strdup("Auto de Jonathan"));
+    hash_insertar(garage, "QDM443", strdup("Auto de Daniela"));
+    hash_insertar(garage, "KMW765", strdup("Auto de Charly"));
+
+    hash_quitar(garage, "QDM443");
+
+    int estado = hash_quitar(garage, "QDM443");
+
+    printf("\t%s: Quitar elemento ya borrado %s ERROR. \n",
+        (estado == ERROR)?"EXITO":"FALLO",
+        (estado == ERROR)?"devuelve":"no devuelve");
+
+    hash_destruir(garage);
+}
+
+// Pre C.: ---
+// Post C.: Verifica que insertar un elemento nulo (pero con clave válida) devuelva éxito, imprimiendo el resultado de la prueba por pantalla.
+void insertar_elemento_nulo_con_clave_valida_deberia_devolver_exito(){
+    hash_t* garage = hash_crear(destruir_string, 2);
+
+    printf("\nPrueba #10: Insertar un elemento nulo con clave válida debería devolver éxito.\n");
+
+    int estado = hash_insertar(garage, "KMW765", NULL);
+
+    printf("\t%s: Insertar elemento nulo con clave válida %s ERROR. \n",
+        (estado == EXITO)?"EXITO":"FALLO",
+        (estado == EXITO)?"devuelve":"no devuelve");
+
+    hash_destruir(garage);
+}
+
 
 int main(){
     system("clear");
@@ -220,13 +288,16 @@ int main(){
     ejecutar_caso_feliz();
 
     // Tests propios:
-    con_hash_vacio_hash_quitar_deberia_devolver_error();
-    sobrepasar_el_factor_maximo_de_carga_deberia_rehashear();
+    con_hash_vacio_hash_quitar_deberia_devolver_error(); // Hash nulo es considerado vacío, por lo que 'vacío' y 'nulo' son equivalentes en esta prueba.
+    sobrepasar_el_factor_maximo_de_carga_deberia_rehashear_y_conservar_los_elementos();
     si_pido_un_elemento_con_clave_no_existente_deberia_devolver_NULL();
     con_hash_vacio_la_cantidad_de_elementos_deberia_ser_cero();
     ejecutar_iterador_siguiente_sobre_el_ultimo_elemento_deberia_devolver_NULL();
     insertar_elemento_sobre_hash_nulo_deberia_devolver_error();
     con_hash_vacio_el_iterador_externo_no_deberia_tener_siguiente();
+    insertar_elemento_con_clave_nula_deberia_devolver_error();
+    quitar_elemento_no_existente_deberia_devolver_error();
+    insertar_elemento_nulo_con_clave_valida_deberia_devolver_exito();
 
     return 0;
 }

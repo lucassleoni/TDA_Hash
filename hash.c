@@ -208,6 +208,9 @@ int rehashear(hash_t* hash){
  */
 int hash_insertar(hash_t* hash, const char* clave, void* elemento){
 	if(hay_error_hash(hash) || (clave == NULL)){
+		if(clave == NULL){
+			(hash->destructor)(elemento);
+		}
 		return ERROR;
 	}
 
