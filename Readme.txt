@@ -138,7 +138,15 @@ Funciones Propias (para modularizar la implementacíon de la lista/iterador)
      Almacena todos los elementos del Hash en un vector estático.
 
 6) Rehash ---> int rehashear(hash_t* hash);
-     Redimensiona el vector_listas_hash, actualizando la capacidad del Hash y volviendo a insertar todos los elementos.
+     Redimensiona el vector_listas_hash, actualizando la capacidad del Hash (al número primo más cercano del doble de su capacidad actual)
+     y volviendo a insertar todos los elementos.
+
+    6.1) Numero primo cercano ---> size_t numero_primo_mas_cercano(size_t capacidad);
+            Esta función recibe la capacidad actual del Hash, localiza el primer número primo existente luego del valor recibido
+            y lo devuelve.
+
+    6.2) Verificar número primo ---> bool es_numero_primo(size_t numero);
+            Devuelve 'true' si el número recibido es primo.
 
 7) Destrucción de cada elemento (para hash_destruir) ---> int destruir_cada_elemento(hash_t* hash);
      Invoca a la función destructora con cada elemento del Hash, utilizando el iterador externo de la lista.

@@ -44,7 +44,9 @@ void hash_crear_listas(lista_t** vector_listas_hash, size_t capacidad, bool* hay
 				lista_destruir(vector_listas_hash[j]);
 			}
 		}
-		i++;
+		else{
+			i++;
+		}
 	}
 }
 
@@ -110,7 +112,7 @@ size_t hashear(const char* clave, size_t capacidad){
 
 // Pre C.: Recibe punteros al Hash y a un vector estático de tipo 'bloque_t*', junto con su tope.
 // Post C.: Almacena todos los elementos del Hash en un vector estático.
-void guardar_elementos(hash_t* hash, bloque_t* vector[], int* posicion_elemento){
+void guardar_elementos(hash_t* hash, bloque_t** vector, int* posicion_elemento){
 	lista_t* lista_corriente = NULL;
 
 	for(int i = 0; i < hash->capacidad; i++){
@@ -127,6 +129,35 @@ void guardar_elementos(hash_t* hash, bloque_t* vector[], int* posicion_elemento)
 	}
 }
 
+// Pre C.: Recibe un número.
+// Post C.: Devuelve 'true' si el número es primo.
+bool es_numero_primo(size_t numero){
+	size_t i = 2;
+	bool es_primo = true;
+
+	while((i < numero) && (es_primo)){
+		if(numero % i == 0){
+			es_primo = false;
+		}
+
+		i++;
+	}
+
+	return es_primo;
+}
+
+// Pre C.: Recibe un número (el doble de la capacidad del Hash actual).
+// Post C.: Devuelve la nueva capacidad del Hash generado por el rehash.
+size_t numero_primo_mas_cercano(size_t capacidad){
+	size_t numero = capacidad;
+
+	while(!es_numero_primo(numero)){
+		numero++;
+	}
+
+	return numero;
+}
+
 // Pre C.: Recibe un puntero al Hash.
 // Post C.: Redimensiona el vector_listas_hash, actualizando la capacidad del Hash y volviendo a insertar todos los elementos.
 int rehashear(hash_t* hash){
@@ -134,7 +165,7 @@ int rehashear(hash_t* hash){
 		return ERROR;
 	}
 
-	size_t nueva_capacidad = hash->capacidad * TAM_REHASH;
+	size_t nueva_capacidad = numero_primo_mas_cercano(hash->capacidad * TAM_REHASH);
 	lista_t** vector_hash_aux = realloc(hash->vector_listas_hash, sizeof(lista_t*) * nueva_capacidad);
 	if(vector_hash_aux == NULL){
 		return ERROR;
@@ -148,9 +179,9 @@ int rehashear(hash_t* hash){
 
 	guardar_elementos(hash, vector_bloques, &posicion_elemento);
 
-	hash->capacidad = nueva_capacidad;
 	hash->factor_de_carga = 0;
 	hash->cantidad_elementos = 0;
+	hash->capacidad = nueva_capacidad;
 
 	bool hay_lista_nula = false;
 	hash_crear_listas(hash->vector_listas_hash, hash->capacidad, &(hay_lista_nula));
@@ -161,12 +192,11 @@ int rehashear(hash_t* hash){
 	}
 
 	for(int i = 0; i < posicion_elemento; i++){
-		hash_insertar(hash, vector_bloques[i]->clave, strdup(vector_bloques[i]->elemento));
-		if((hash->destructor) != NULL){
-			(hash->destructor)(vector_bloques[i]->elemento);
-		}
-		free(vector_bloques[i]->clave);
-		free(vector_bloques[i]);
+		size_t posicion_hash = hashear(vector_bloques[i]->clave, hash->capacidad);
+		lista_t* lista = hash->vector_listas_hash[posicion_hash];
+		lista_insertar(lista, vector_bloques[i]);
+		(hash->cantidad_elementos)++;
+		hash->factor_de_carga = hash->cantidad_elementos / hash->capacidad;
 	}
 
 	return EXITO;
@@ -177,7 +207,7 @@ int rehashear(hash_t* hash){
  * Devuelve 0 si pudo guardarlo o -1 si no pudo.
  */
 int hash_insertar(hash_t* hash, const char* clave, void* elemento){
-	if(hay_error_hash(hash)){
+	if(hay_error_hash(hash) || (clave == NULL)){
 		return ERROR;
 	}
 
@@ -245,7 +275,7 @@ bloque_t* buscar_nodo_por_clave(lista_t* lista, const char* clave, size_t* conta
  * Devuelve 0 si pudo eliminar el elemento o -1 si no pudo.
  */
 int hash_quitar(hash_t* hash, const char* clave){
-	if((hay_error_hash(hash)) || (hash_vacio(hash))){
+	if((hay_error_hash(hash)) || (hash_vacio(hash)) || (clave == NULL)){
 		return ERROR;
 	}
 	
@@ -297,7 +327,7 @@ void* hash_obtener(hash_t* hash, const char* clave){
  * clave dada o false en caso contrario.
  */
 bool hash_contiene(hash_t* hash, const char* clave){
-	if((hay_error_hash(hash)) || (hash_vacio(hash))){
+	if((hay_error_hash(hash)) || (hash_vacio(hash)) || (clave == NULL)){
 		return false;
 	}
 	
